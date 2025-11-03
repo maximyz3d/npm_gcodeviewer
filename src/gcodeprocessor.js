@@ -36,6 +36,12 @@ export default class {
       this.sps;
       this.maxHeight = 0;
       this.minHeight = 0;
+      this.minX = Infinity;
+      this.minY = Infinity;
+      this.minZ = Infinity;
+      this.maxX = -Infinity;
+      this.maxY = -Infinity;
+      this.maxZ = -Infinity;
       this.lineCount = 0;
       this.renderMode = '';
       this.extruderCount = 10;
@@ -327,6 +333,10 @@ export default class {
       this.firstGCodeByte = 0;
       this.lastGCodeByte = 0;
       
+      // reset global XYZ bounds for this file
+      this.minX =  Infinity; this.minY =  Infinity; this.minZ =  Infinity;
+      this.maxX = -Infinity; this.maxY = -Infinity; this.maxZ = -Infinity;
+      
       this.layerDictionary = []; //Dictionary of file positions where Z changes
       this.lastZExtrusion = 0; //We'll use this to drive layers
 
@@ -447,6 +457,14 @@ export default class {
 
       line.end = this.currentPosition.clone();
 
+      // Track global min/max bounds for XYZ
+      this.minX = Math.min(this.minX, this.currentPosition.x);
+      this.minY = Math.min(this.minY, this.currentPosition.y);
+      this.minZ = Math.min(this.minZ, this.currentPosition.z);
+      this.maxX = Math.max(this.maxX, this.currentPosition.x);
+      this.maxY = Math.max(this.maxY, this.currentPosition.y);
+      this.maxZ = Math.max(this.maxZ, this.currentPosition.z);
+      
       if (this.debug) {
          // console.log(`${tokenString}   absolute:${this.absolute}`)
          //  console.log(lineNumber, line)
@@ -550,6 +568,23 @@ export default class {
          line.start = curPt.clone();
          line.end = new Vector3(point.x, point.y, point.z);
          
+         // Track global min/max using the segment endpoints
+         // start:
+         this.minX = Math.min(this.minX, line.start.x);
+         this.minY = Math.min(this.minY, line.start.y);
+         this.minZ = Math.min(this.minZ, line.start.z);
+         this.maxX = Math.max(this.maxX, line.start.x);
+         this.maxY = Math.max(this.maxY, line.start.y);
+         this.maxZ = Math.max(this.maxZ, line.start.z);
+         
+         // end:
+         this.minX = Math.min(this.minX, line.end.x);
+         this.minY = Math.min(this.minY, line.end.y);
+         this.minZ = Math.min(this.minZ, line.end.z);
+         this.maxX = Math.max(this.maxX, line.end.x);
+         this.maxY = Math.max(this.maxY, line.end.y);
+         this.maxZ = Math.max(this.maxZ, line.end.z);
+
          line.extruding = extruding;
 
          if (extruding) {
@@ -685,7 +720,7 @@ export default class {
                this.currentColor = this.slicer.getFeatureColor();
             }
          }
-
+         
          if (Date.now() - this.timeStamp > 10) {
             if (this.loadingProgressCallback) {
                this.loadingProgressCallback(filePosition / file.length, 'Loading File...');
@@ -695,6 +730,24 @@ export default class {
          this.doUpdate();
       }
 
+      const centerX = (this.minX + this.maxX) / 2;
+      const centerY = (this.minY + this.maxY) / 2;
+      const centerZ = (this.minZ + this.maxZ) / 2;
+      const sizeX = this.maxX - this.minX;
+      const sizeY = this.maxY - this.minY;
+      const sizeZ = this.maxZ - this.minZ;
+      const radius = Math.max(Math.hypot(sizeX, sizeY, sizeZ) / 2, 1);
+      
+      this.gcodeBounds = {
+        min: new Vector3(this.minX, this.minY, this.minZ),
+        max: new Vector3(this.maxX, this.maxY, this.maxZ),
+        center: new Vector3(centerX, centerY, centerZ),
+        size: new Vector3(sizeX, sizeY, sizeZ),
+        radius
+      };
+
+      getGcodeBounds() { return this.gcodeBounds; }
+      
       this.layerDictionary.push(file.length);
 
       //build the travel mesh
