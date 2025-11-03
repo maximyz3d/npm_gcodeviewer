@@ -308,6 +308,38 @@ export default class {
       this.scene.render(true);
       this.scene.render(true);
    }
+   
+   OrbitObject() {
+      // Make sure the processor and bounds exist
+      if (!this.processor || !this.processor.gcodeBounds) {
+         console.warn("No G-code bounds available yet.");
+         return;
+      }
+   
+      const bounds = this.processor.gcodeBounds;
+      const center = bounds.center;
+      const size   = bounds.size;
+      const radius = bounds.radius;
+   
+      // Center the camera on the object instead of the bed
+      this.scene.activeCamera.target = new Vector3(center.x, center.y, center.z);
+   
+      // Position camera a bit back and above the object, scaled by size
+      this.scene.activeCamera.position = new Vector3(
+         center.x - size.x * 1.5,
+         center.y + size.y * 1.5,
+         center.z - size.z * 1.5
+      );
+   
+      // Adjust radius so zoom fits the whole object
+      this.scene.activeCamera.radius = radius * 2;
+   
+      // Render twice to refresh
+      this.scene.render(true);
+      this.scene.render(true);
+   
+      console.log("Camera centered on object:", bounds);
+   }
 
    lastLoadFailed() {
       if (!localStorage) return false;
@@ -735,3 +767,4 @@ export default class {
 
 
 }
+
