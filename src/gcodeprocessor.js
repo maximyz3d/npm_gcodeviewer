@@ -745,8 +745,6 @@ export default class {
         size: new Vector3(sizeX, sizeY, sizeZ),
         radius
       };
-
-      getGcodeBounds() { return this.gcodeBounds; }
       
       this.layerDictionary.push(file.length);
 
@@ -761,6 +759,8 @@ export default class {
 
       file = {}; //Clear out the file.
    }
+
+   getGcodeBounds() { return this.gcodeBounds; }
 
    loadingComplete() {
       this.renderInstances.forEach((inst) => (inst.isLoading = false));
