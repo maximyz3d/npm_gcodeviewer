@@ -307,38 +307,40 @@ export default class {
       }
       this.scene.render(true);
       this.scene.render(true);
-   }
-   
-   OrbitObject() {
-      // Make sure the processor and bounds exist
-      if (!this.processor || !this.processor.gcodeBounds) {
-         console.warn("No G-code bounds available yet.");
-         return;
+   }  
+      
+   orbitObject() {
+      const b = this.gcodeProcessor?.getGcodeBounds?.();
+      if (!b) {
+        console.warn("No G-code bounds available yet.");
+        return;
       }
-   
-      const bounds = this.processor.gcodeBounds;
-      const center = bounds.center;
-      const size   = bounds.size;
-      const radius = bounds.radius;
-   
-      // Center the camera on the object instead of the bed
-      this.scene.activeCamera.target = new Vector3(center.x, center.y, center.z);
-   
-      // Position camera a bit back and above the object, scaled by size
-      this.scene.activeCamera.position = new Vector3(
-         center.x - size.x * 1.5,
-         center.y + size.y * 1.5,
-         center.z - size.z * 1.5
-      );
-   
-      // Adjust radius so zoom fits the whole object
-      this.scene.activeCamera.radius = radius * 2;
-   
-      // Render twice to refresh
+    
+      const c = b.center; // Vector3
+      const s = b.size;   // Vector3
+    
+      if (this.bed.isDelta) {
+        // mirror your resetCamera() delta mapping, but use object bounds
+        this.scene.activeCamera.radius  = Math.max(b.radius, 1);
+        this.scene.activeCamera.target  = new Vector3(c.x, -2, c.z);
+        this.scene.activeCamera.position = new Vector3(
+          c.x - s.x,      // “left” of object
+          c.y + s.y,      // above object
+          c.z - s.x       // “behind” using X span like your bed code
+        );
+      } else {
+        // mirror your resetCamera() cartesian mapping, but use object bounds
+        this.scene.activeCamera.radius  = Math.max(b.radius * 2, 1);
+        this.scene.activeCamera.target  = new Vector3(c.x, -2, c.z);
+        this.scene.activeCamera.position = new Vector3(
+          c.x - s.x / 2,  // half-width left
+          c.y + s.y,      // above
+          c.z - s.z / 2   // half-depth back
+        );
+      }
+    
       this.scene.render(true);
       this.scene.render(true);
-   
-      console.log("Camera centered on object:", bounds);
    }
 
    lastLoadFailed() {
@@ -767,4 +769,5 @@ export default class {
 
 
 }
+
 
