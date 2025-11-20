@@ -80,6 +80,10 @@ export default class {
       this.simulationStopped = () => {};
       this.simLine = Vector3.Zero();
       this.isMMS = false;
+
+      //Camera follow nozzle
+      this.followTopView = false;
+      this.followTopViewRadius = 0;
    }
    getMaxHeight() {
       return this.maxHeight;
@@ -343,6 +347,76 @@ export default class {
       this.scene.render(true);
       this.scene.render(true);
    }
+      // Choose a sensible radius when entering top-follow mode
+   _computeFollowTopRadius() {
+      // Prefer object bounds if we have them
+      if (this.gcodeProcessor && typeof this.gcodeProcessor.getGcodeBounds === 'function') {
+         const b = this.gcodeProcessor.getGcodeBounds();
+         if (b && b.radius) {
+            return Math.max(b.radius * 1.2, 10);
+         }
+      }
+
+      // Fall back to bed size
+      if (this.bed && typeof this.bed.getSize === 'function') {
+         const bedSize = this.bed.getSize();
+         return Math.max(bedSize.x, bedSize.y) * 1.2;
+      }
+
+      // Last resort: current camera radius
+      return this.orbitCamera ? this.orbitCamera.radius : 200;
+   }
+
+   // Keep the ArcRotateCamera in a top-down view centered on the nozzle
+   _updateTopFollowCamera() {
+      if (!this.orbitCamera || !this.toolCursor) return;
+
+      // Get nozzle world position
+      let nozzlePos = Vector3.Zero();
+      try {
+         if (typeof this.toolCursor.getAbsolutePosition === 'function') {
+            nozzlePos = this.toolCursor.getAbsolutePosition();
+         } else if (this.toolCursor.position) {
+            nozzlePos = this.toolCursor.position.clone();
+         } else if (this.gcodeProcessor && this.gcodeProcessor.nozzlePosition) {
+            nozzlePos = this.gcodeProcessor.nozzlePosition.clone();
+         }
+      } catch (e) {
+         // If anything weird happens, just bail quietly
+         return;
+      }
+
+      const cam = this.orbitCamera;
+
+      // Flatten target to bed plane (Y = 0) so it's a true plan view
+      const targetY = 0;
+      cam.target = new Vector3(nozzlePos.x, targetY, nozzlePos.z);
+
+      // Lock camera to a top-down view (from +Y looking down)
+      cam.beta = 0.0001;  // almost straight down from +Y
+      // alpha doesn't matter much for top view, but keep it stable
+      // so the user sees a consistent orientation
+      if (isNaN(cam.alpha)) {
+         cam.alpha = 0;
+      }
+
+      // Set or reuse radius
+      if (!this.followTopViewRadius || this.followTopViewRadius <= 0) {
+         this.followTopViewRadius = this._computeFollowTopRadius();
+      }
+      cam.radius = this.followTopViewRadius;
+   }
+   // Enable/disable top-down follow mode
+   setTopFollow(enabled) {
+      this.followTopView = !!enabled;
+
+      if (this.followTopView) {
+         // Initialize radius and force one immediate update
+         this.followTopViewRadius = this._computeFollowTopRadius();
+         this._updateTopFollowCamera();
+         this.forceRender();
+      }
+   }
 
    lastLoadFailed() {
       if (!localStorage) return false;
@@ -540,6 +614,12 @@ export default class {
 
       this.toolCursor.setAbsolutePosition(new Vector3(x, z, y));
       this.updateToolOrientationFromA();
+
+      // NEW: if top-follow mode is enabled, keep camera locked on nozzle
+      if (this.followTopView) {
+         this._updateTopFollowCamera();
+      }
+    
       if (this.toolCursorMesh.isVisible) {
          this.scene.render();
       }
@@ -792,6 +872,7 @@ export default class {
 
 
 }
+
 
 
 
