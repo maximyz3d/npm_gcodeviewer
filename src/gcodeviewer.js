@@ -82,7 +82,7 @@ export default class {
       this.isMMS = false;
 
       //Camera follow nozzle
-      this.followTopView = false;
+      this.followTopView = true;
       this.followTopViewRadius = 0;
    }
    getMaxHeight() {
@@ -872,6 +872,7 @@ export default class {
 
 
 }
+
 
 
 
