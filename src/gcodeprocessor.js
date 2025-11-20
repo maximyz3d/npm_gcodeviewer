@@ -555,20 +555,25 @@ export default class {
       let tokens = tokenString.split(/(?=[GXYZIJKFREUVAB])/);
       let extruding = tokenString.indexOf('E') > 0 || this.g1AsExtrusion; //Treat as an extrusion in cnc mode
       let cw = tokens.filter((t) => t === 'G2' || t === 'G02');
-      for (let i = 0; i < tokens.length; i++) {
-         const t = tokens[i];
-         if (t[0] === 'A') {
-            const aVal = Number(t.substring(1));
-            this.currentA = this.absolute ? aVal : this.currentA + aVal;
-         }
-      }
-      
       let arcResult = { position: this.currentPosition.clone(), points: [] };
       try {
          arcResult = doArc(tokens, this.currentPosition, !this.absolute, 0.1, this.fixRadius, this.arcPlane, this.workplaceOffsets[this.currentWorkplace]);
       } catch (ex) {
          console.error(`Arc Error`, ex);
       }
+      const startA = this.currentA;
+      let targetA = this.currentA;
+
+      // Look for an A token on this G2/G3 line
+      for (let tokenIdx = 1; tokenIdx < tokens.length; tokenIdx++) {
+         const token = tokens[tokenIdx];
+         if (token[0] === 'A') {
+            const aVal = Number(token.substring(1));
+            targetA = this.absolute ? aVal : startA + aVal;
+            break;
+         }
+      }
+
       let curPt = this.currentPosition.clone();
       arcResult.points.forEach((point, idx) => {
          const line = new gcodeLine();
@@ -585,7 +590,9 @@ export default class {
 
          line.start = curPt.clone();
          line.end = new Vector3(point.x, point.y, point.z);
-         line.aAngle = this.currentA;
+         // Interpolate A along the arc: startA -> targetA
+         const t = numPts > 1 ? (idx + 1) / numPts : 1;   // 0..1 along arc
+         line.aAngle = startA + (targetA - startA) * t;
          
          // Track global min/max using the segment endpoints
          // start:
@@ -641,6 +648,9 @@ export default class {
 
       //Last point to currentposition
       this.currentPosition = new Vector3(curPt.x, curPt.y, curPt.z);
+
+      // End of arc: commit final A value
+      this.currentA = targetA;
 
       if (this.currentPosition.y > this.currentLayerHeight && !this.isSupport) {
          this.previousLayerHeight = this.currentLayerHeight;
