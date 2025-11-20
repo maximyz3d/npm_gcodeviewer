@@ -127,6 +127,7 @@ export default class {
       this.everyNthRow = 0;
       this.currentRowIdx = -1;
       this.currentZ = 0;
+      this.currentA = 0;
 
       this.renderTravels = true;
       this.persistTravels = false;
@@ -173,7 +174,9 @@ export default class {
       this.nozzleStartPosition = new Vector3(0, 0, 0);
       this.nozzlePosition = new Vector3(0, 0, 0);
       this.nozzleFeedRate = 0;
-
+      this.currentA = 0;           // current A value (deg)
+      this.nozzleAngle = 0;        // A value for current nozzle position
+      
       this.firmwareRetraction = false;
       this.inches = false;
       this.fixRadius = false;
@@ -415,6 +418,11 @@ export default class {
                   }
                }
                break;
+            case 'A':
+               // Tangential axis, treat like an angular coordinate (deg)
+               const aVal = Number(token.substring(1));
+               this.currentA = this.absolute ? aVal : this.currentA + aVal;
+               break;
             case 'E':
                //Do not count retractions as extrusions
                if (Number(token.substring(1)) > 0) {
@@ -456,6 +464,7 @@ export default class {
       }
 
       line.end = this.currentPosition.clone();
+      line.aAngle = this.currentA;   // store angle on this line
 
       // Track global min/max bounds for XYZ
       this.minX = Math.min(this.minX, this.currentPosition.x);
@@ -1025,6 +1034,7 @@ export default class {
          this.nozzleStartPosition = this.renderedLines[i].start;
          this.nozzlePosition = this.renderedLines[i].end;
          this.nozzleFeedRate = this.renderedLines[i].feedRate;
+         this.nozzleAngle     = this.renderedLines[i].aAngle ?? this.nozzleAngle;
 
          this.lastFilePositionIndex = i;
       }
@@ -1038,6 +1048,7 @@ export default class {
       this.nozzleStartPosition = this.renderedLines[index].start;
       this.nozzlePosition = this.renderedLines[index].end;
       this.nozzleFeedRate = this.renderedLines[index].feedRate;
+      this.nozzleAngle     = this.renderedLines[index].aAngle ?? this.nozzleAngle;
       this.lastFilePositionIndex = index;
       this.renderInstances.forEach((r) => r.updateFilePosition(this.renderedLines[index].gcodeFilePosition));
       this.doUpdate();
