@@ -84,6 +84,7 @@ export default class {
       //Camera follow nozzle
       this.followTopView = true;
       this.followTopViewRadius = 0;
+      this.followTopViewDefaultRadius = 120;
    }
    getMaxHeight() {
       return this.maxHeight;
@@ -399,20 +400,23 @@ export default class {
       if (isNaN(cam.alpha)) {
          cam.alpha = 0;
       }
-
-      // Set or reuse radius
-      if (!this.followTopViewRadius || this.followTopViewRadius <= 0) {
-         this.followTopViewRadius = this._computeFollowTopRadius();
-      }
-      cam.radius = this.followTopViewRadius;
    }
+ 
    // Enable/disable top-down follow mode
    setTopFollow(enabled) {
       this.followTopView = !!enabled;
-
+   
       if (this.followTopView) {
-         // Initialize radius and force one immediate update
-         this.followTopViewRadius = this._computeFollowTopRadius();
+         const cam = this.orbitCamera;
+         if (cam) {
+            // Set initial zoom ONLY when turning on follow mode.
+            // Use a simple fixed number so it’s nice and close.
+            cam.radius = this.followTopViewDefaultRadius;
+   
+            // Optional: keep a copy so you can reuse/log it if needed
+            this.followTopViewRadius = cam.radius;
+         }
+   
          this._updateTopFollowCamera();
          this.forceRender();
       }
@@ -872,6 +876,7 @@ export default class {
 
 
 }
+
 
 
 
