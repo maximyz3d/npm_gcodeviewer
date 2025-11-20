@@ -84,7 +84,10 @@ export default class {
       //Camera follow nozzle
       this.followTopView = true;
       this.followTopViewRadius = 0;
-      this.followTopViewDefaultRadius = 120;
+      this.followTopViewDefaultRadius = 20;
+
+      // NEW: track when we’ve already applied the initial zoom
+      this._followTopViewInitialized = false;
    }
    getMaxHeight() {
       return this.maxHeight;
@@ -371,7 +374,16 @@ export default class {
    // Keep the ArcRotateCamera in a top-down view centered on the nozzle
    _updateTopFollowCamera() {
       if (!this.orbitCamera || !this.toolCursor) return;
-
+   
+      const cam = this.orbitCamera;
+   
+      // NEW: only on first run of follow mode, set the base zoom
+      if (!this._followTopViewInitialized) {
+         cam.radius = this.followTopViewDefaultRadius;
+         this.followTopViewRadius = cam.radius;
+         this._followTopViewInitialized = true;
+      }
+   
       // Get nozzle world position
       let nozzlePos = Vector3.Zero();
       try {
@@ -383,23 +395,20 @@ export default class {
             nozzlePos = this.gcodeProcessor.nozzlePosition.clone();
          }
       } catch (e) {
-         // If anything weird happens, just bail quietly
          return;
       }
-
-      const cam = this.orbitCamera;
-
+   
       // Flatten target to bed plane (Y = 0) so it's a true plan view
       const targetY = 0;
       cam.target = new Vector3(nozzlePos.x, targetY, nozzlePos.z);
-
+   
       // Lock camera to a top-down view (from +Y looking down)
-      cam.beta = 0.0001;  // almost straight down from +Y
-      // alpha doesn't matter much for top view, but keep it stable
-      // so the user sees a consistent orientation
+      cam.beta = 0.0001;
       if (isNaN(cam.alpha)) {
          cam.alpha = 0;
       }
+   
+      // IMPORTANT: no more cam.radius changes here after first init
    }
  
    // Enable/disable top-down follow mode
@@ -407,15 +416,8 @@ export default class {
       this.followTopView = !!enabled;
    
       if (this.followTopView) {
-         const cam = this.orbitCamera;
-         if (cam) {
-            // Set initial zoom ONLY when turning on follow mode.
-            // Use a simple fixed number so it’s nice and close.
-            cam.radius = this.followTopViewDefaultRadius;
-   
-            // Optional: keep a copy so you can reuse/log it if needed
-            this.followTopViewRadius = cam.radius;
-         }
+         // Next update will re-apply the base zoom
+         this._followTopViewInitialized = false;
    
          this._updateTopFollowCamera();
          this.forceRender();
@@ -876,6 +878,7 @@ export default class {
 
 
 }
+
 
 
 
