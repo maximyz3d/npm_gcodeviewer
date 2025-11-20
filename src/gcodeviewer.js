@@ -592,7 +592,7 @@ export default class {
    updateToolOrientationFromA() {
       if (!this.toolCursorMesh || !this._nozzleBaseQuat) return;
       const aDeg = this.gcodeProcessor?.nozzleAngle ?? 0;
-      const aRad = (aDeg * Math.PI) / 180;
+      const aRad = (-aDeg * Math.PI) / 180;
 
       // A is tangential about the vertical axis; in viewer coords
       // X,Z is the XY plane, Y is vertical, so rotate about Axis.Y
@@ -792,6 +792,7 @@ export default class {
 
 
 }
+
 
 
 
