@@ -573,7 +573,9 @@ export default class {
             break;
          }
       }
-
+      // number of points generated for this arc
+      const numPts = arcResult.points.length > 0 ? arcResult.points.length : 1;
+      
       let curPt = this.currentPosition.clone();
       arcResult.points.forEach((point, idx) => {
          const line = new gcodeLine();
@@ -591,7 +593,7 @@ export default class {
          line.start = curPt.clone();
          line.end = new Vector3(point.x, point.y, point.z);
          // Interpolate A along the arc: startA -> targetA
-         const t = numPts > 1 ? (idx + 1) / numPts : 1;   // 0..1 along arc
+         const t = numPts > 1 ? idx / (numPts - 1) : 1;   // 0..1 along arc
          line.aAngle = startA + (targetA - startA) * t;
          
          // Track global min/max using the segment endpoints
