@@ -127,7 +127,6 @@ export default class {
       this.everyNthRow = 0;
       this.currentRowIdx = -1;
       this.currentZ = 0;
-      this.currentA = 0;
 
       this.renderTravels = true;
       this.persistTravels = false;
@@ -339,6 +338,8 @@ export default class {
       // reset global XYZ bounds for this file
       this.minX =  Infinity; this.minY =  Infinity; this.minZ =  Infinity;
       this.maxX = -Infinity; this.maxY = -Infinity; this.maxZ = -Infinity;
+      this.currentA = 0;
+      this.nozzleAngle = 0;
       
       this.layerDictionary = []; //Dictionary of file positions where Z changes
       this.lastZExtrusion = 0; //We'll use this to drive layers
