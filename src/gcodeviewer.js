@@ -11,6 +11,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
 import { Axis, Space } from '@babylonjs/core/Maths/math.axis';
+import { Quaternion } from '@babylonjs/core/Maths/math.vector';
 import { version } from '../package.json';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
@@ -538,6 +539,7 @@ export default class {
       }
 
       this.toolCursor.setAbsolutePosition(new Vector3(x, z, y));
+      this.updateToolOrientationFromA();
       if (this.toolCursorMesh.isVisible) {
          this.scene.render();
       }
@@ -560,6 +562,14 @@ export default class {
          this.toolCursorMesh.rotate(Axis.Y, Math.PI, Space.LOCAL);
          this.toolCursorMesh.rotate(Axis.Z, Math.PI, Space.LOCAL);
          this.toolCursorMesh.scaling = new Vector3(-1, 1, 1);
+         // Save the static orientation as a base quaternion
+         this._nozzleBaseQuat =
+           this.toolCursorMesh.rotationQuaternion ??
+           Quaternion.FromEulerAngles(
+             this.toolCursorMesh.rotation.x,
+             this.toolCursorMesh.rotation.y,
+             this.toolCursorMesh.rotation.z
+           );
       } else {
          //load cone version
       }
@@ -578,6 +588,18 @@ export default class {
       if (localStorage) {
          localStorage.setItem('renderQuality', renderQuality);
       }
+   }
+   updateToolOrientationFromA() {
+      if (!this.toolCursorMesh || !this._nozzleBaseQuat) return;
+      const aDeg = this.gcodeProcessor?.nozzleAngle ?? 0;
+      const aRad = (aDeg * Math.PI) / 180;
+
+      // A is tangential about the vertical axis; in viewer coords
+      // X,Z is the XY plane, Y is vertical, so rotate about Axis.Y
+      const qA = Quaternion.RotationAxis(Axis.Y, aRad);
+
+      // Compose dynamic A rotation with base orientation
+      this.toolCursorMesh.rotationQuaternion = qA.multiply(this._nozzleBaseQuat);
    }
    registerClipIgnore(mesh) {
       if (mesh === undefined || mesh === null) return;
@@ -746,6 +768,7 @@ export default class {
       this.scene.activeCamera.target = new Vector3(Number(x) ,Number(z), Number(y));
       this.forceRender();
    }
+   
 
    async createScreenshot(width = 1920, height = 1080) {
       var clearColor = this.scene.clearColor;
@@ -769,5 +792,6 @@ export default class {
 
 
 }
+
 
 
