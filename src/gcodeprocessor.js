@@ -555,6 +555,14 @@ export default class {
       let tokens = tokenString.split(/(?=[GXYZIJKFREUVAB])/);
       let extruding = tokenString.indexOf('E') > 0 || this.g1AsExtrusion; //Treat as an extrusion in cnc mode
       let cw = tokens.filter((t) => t === 'G2' || t === 'G02');
+      for (let i = 0; i < tokens.length; i++) {
+         const t = tokens[i];
+         if (t[0] === 'A') {
+            const aVal = Number(t.substring(1));
+            this.currentA = this.absolute ? aVal : this.currentA + aVal;
+         }
+      }
+      
       let arcResult = { position: this.currentPosition.clone(), points: [] };
       try {
          arcResult = doArc(tokens, this.currentPosition, !this.absolute, 0.1, this.fixRadius, this.arcPlane, this.workplaceOffsets[this.currentWorkplace]);
@@ -577,6 +585,7 @@ export default class {
 
          line.start = curPt.clone();
          line.end = new Vector3(point.x, point.y, point.z);
+         line.aAngle = this.currentA;
          
          // Track global min/max using the segment endpoints
          // start:
