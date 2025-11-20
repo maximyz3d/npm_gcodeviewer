@@ -19,6 +19,7 @@ export default class {
     this.feedRate = 0;
     this.layerHeight = 0;
     this.isPerimeter = false;
+    this.aAngle = 0;            // ← NEW: tangential A-axis angle (deg)
   }
 
   length() {
@@ -146,3 +147,4 @@ export default class {
 
 
 }
+
