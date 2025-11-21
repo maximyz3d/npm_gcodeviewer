@@ -88,6 +88,8 @@ export default class {
 
       // NEW: track when we’ve already applied the initial zoom
       this._followTopViewInitialized = false;
+      this.followTopViewLock = true;    // "Top View Lock" switch
+      this.followPathDirection = false; // "Camera Follows Path Direction" switch
    }
    getMaxHeight() {
       return this.maxHeight;
@@ -351,7 +353,7 @@ export default class {
       this.scene.render(true);
       this.scene.render(true);
    }
-      // Choose a sensible radius when entering top-follow mode
+   // Choose a sensible radius when entering top-follow mode
    _computeFollowTopRadius() {
       // Prefer object bounds if we have them
       if (this.gcodeProcessor && typeof this.gcodeProcessor.getGcodeBounds === 'function') {
@@ -377,7 +379,7 @@ export default class {
    
       const cam = this.orbitCamera;
    
-      // NEW: only on first run of follow mode, set the base zoom
+      // only on first run of follow mode, set the base zoom
       if (!this._followTopViewInitialized) {
          cam.radius = this.followTopViewDefaultRadius;
          this.followTopViewRadius = cam.radius;
@@ -401,15 +403,28 @@ export default class {
       // Flatten target to bed plane (Y = 0) so it's a true plan view
       const targetY = 0;
       cam.target = new Vector3(nozzlePos.x, targetY, nozzlePos.z);
-   
-      // Lock camera to a top-down view (from +Y looking down)
-      cam.beta = 0.0001;
-      if (isNaN(cam.alpha)) {
-         cam.alpha = 0;
+
+      // === TOP VIEW LOCK + PATH DIRECTION BEHAVIOR ===
+      if (this.followTopViewLock) {
+         // Keep a top-down view (from +Y looking down)
+         cam.beta = 0.0001;
+
+         if (this.followPathDirection) {
+            // Align camera alpha with tangential A-axis / path direction
+            const aDeg = this.gcodeProcessor?.nozzleAngle ?? 0;
+            const aRad = (-aDeg * Math.PI) / 180;
+            cam.alpha = aRad;
+         } else if (isNaN(cam.alpha)) {
+            // Stable default when no alpha has been set
+            cam.alpha = 0;
+         }
       }
-   
+      // If followTopViewLock is false, we leave beta/alpha alone so
+      // the user can freely orbit around the moving tool.
+
       // IMPORTANT: no more cam.radius changes here after first init
    }
+
  
    // Enable/disable top-down follow mode
    setTopFollow(enabled) {
@@ -422,6 +437,16 @@ export default class {
          this._updateTopFollowCamera();
          this.forceRender();
       }
+   }
+
+   // NEW: enable/disable top view lock (beta lock)
+   setTopViewLock(enabled) {
+      this.followTopViewLock = !!enabled;
+   }
+
+   // NEW: enable/disable camera alignment to path direction
+   setFollowPathDirection(enabled) {
+      this.followPathDirection = !!enabled;
    }
 
    lastLoadFailed() {
@@ -878,6 +903,7 @@ export default class {
 
 
 }
+
 
 
 
