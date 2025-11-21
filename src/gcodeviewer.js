@@ -90,6 +90,8 @@ export default class {
       this._followTopViewInitialized = false;
       this.followTopViewLock = true;    // "Top View Lock" switch
       this.followPathDirection = false; // "Camera Follows Path Direction" switch
+      this.lockFrontDirection = true;                    // default ON
+      this.frontViewAlpha = (3 * Math.PI) / 2;           // same as your front/top viewbox orientation
    }
    getMaxHeight() {
       return this.maxHeight;
@@ -414,9 +416,12 @@ export default class {
             const aDeg = this.gcodeProcessor?.nozzleAngle ?? 0;
             const aRad = (-aDeg * Math.PI) / 180;
             cam.alpha = aRad;
+         } else if (this.lockFrontDirection) {
+            // Lock camera orientation to a fixed "front" direction
+            cam.alpha = this.frontViewAlpha; 
          } else if (isNaN(cam.alpha)) {
             // Stable default when no alpha has been set
-            cam.alpha = 0;
+            cam.alpha = this.frontViewAlpha;
          }
       }
       // If followTopViewLock is false, we leave beta/alpha alone so
@@ -447,6 +452,11 @@ export default class {
    // NEW: enable/disable camera alignment to path direction
    setFollowPathDirection(enabled) {
       this.followPathDirection = !!enabled;
+   }
+
+   // NEW: enable/disable locking camera orientation to front
+   setLockFrontDirection(enabled) {
+      this.lockFrontDirection = !!enabled;
    }
 
    lastLoadFailed() {
@@ -903,6 +913,7 @@ export default class {
 
 
 }
+
 
 
 
