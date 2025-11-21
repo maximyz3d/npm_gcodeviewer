@@ -417,10 +417,10 @@ export default class {
             cam.alpha = aRad;
          } else if (this.lockFrontDirection) {
             // Lock camera orientation to a fixed "front" direction
-            cam.alpha = 0.000; //this.frontViewAlpha; 
+            cam.alpha = this.frontViewAlpha; 
          } else if (isNaN(cam.alpha)) {
             // Stable default when no alpha has been set
-            cam.alpha = 0.000; //this.frontViewAlpha;
+            cam.alpha = this.frontViewAlpha;
          }
       }
       // If followTopViewLock is false, we leave beta/alpha alone so
@@ -911,6 +911,7 @@ export default class {
 
 
 }
+
 
 
 
