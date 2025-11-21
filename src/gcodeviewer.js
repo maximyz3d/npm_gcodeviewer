@@ -227,7 +227,6 @@ export default class {
 
       this.resetCamera();
 
-
       createViewBox(this.engine, this.scene, this.orbitCamera);
       registerViewBoxCallback((position) => {
          console.log('viewbox callback', position)
@@ -409,7 +408,7 @@ export default class {
       // === TOP VIEW LOCK + PATH DIRECTION BEHAVIOR ===
       if (this.followTopViewLock) {
          // Keep a top-down view (from +Y looking down)
-         cam.beta = 0.0001;
+         cam.beta = 0.000;
 
          if (this.followPathDirection) {
             // Align camera alpha with tangential A-axis / path direction
@@ -418,19 +417,18 @@ export default class {
             cam.alpha = aRad;
          } else if (this.lockFrontDirection) {
             // Lock camera orientation to a fixed "front" direction
-            cam.alpha = this.frontViewAlpha; 
+            cam.alpha = 0.000; //this.frontViewAlpha; 
          } else if (isNaN(cam.alpha)) {
             // Stable default when no alpha has been set
-            cam.alpha = this.frontViewAlpha;
+            cam.alpha = 0.000; //this.frontViewAlpha;
          }
       }
       // If followTopViewLock is false, we leave beta/alpha alone so
       // the user can freely orbit around the moving tool.
-
+   
       // IMPORTANT: no more cam.radius changes here after first init
    }
 
- 
    // Enable/disable top-down follow mode
    setTopFollow(enabled) {
       this.followTopView = !!enabled;
@@ -913,6 +911,7 @@ export default class {
 
 
 }
+
 
 
 
