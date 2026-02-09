@@ -359,9 +359,10 @@ export default class {
    }
 
    g0g1(tokenString, lineNumber, filePosition, renderLine, command) {
-      let tokens = tokenString.split(/(?=[GXYZEFUVAB])/);
+      let tokens = tokenString.match(/[XYZEFA][+-]?\d*\.?\d+/g) ?? [];
       const line = new gcodeLine();
       let hasXYMove = false;
+      let hasMotionChange = false;
       line.tool = this.currentTool;
       line.gcodeLineNumber = lineNumber;
       line.gcodeFilePosition = filePosition;
@@ -381,31 +382,35 @@ export default class {
 
       for (let tokenIdx = 0; tokenIdx < tokens.length; tokenIdx++) {
          let token = tokens[tokenIdx];
+         const value = Number(token.substring(1));
          switch (token[0]) {
             case 'X':
                if (this.zBelt) {
-                  this.currentPosition.x = Number(token.substring(1));
+                  this.currentPosition.x = value;
                } else {
-                  this.currentPosition.x = this.absolute ? Number(token.substring(1)) + this.workplaceOffsets[this.currentWorkplace].x : this.currentPosition.x + Number(token.substring(1));
+                  this.currentPosition.x = this.absolute ? value + this.workplaceOffsets[this.currentWorkplace].x : this.currentPosition.x + value;
                }
                hasXYMove = true;
+               hasMotionChange = true;
                break;
             case 'Y':
                if (this.zBelt) {
-                  this.currentPosition.y = Number(token.substring(1)) * this.hyp;
+                  this.currentPosition.y = value * this.hyp;
                   this.currentPosition.z = this.currentZ + this.currentPosition.y * this.adj;
                } else {
-                  this.currentPosition.z = this.absolute ? Number(token.substring(1)) + this.workplaceOffsets[this.currentWorkplace].y : this.currentPosition.z + Number(token.substring(1));
+                  this.currentPosition.z = this.absolute ? value + this.workplaceOffsets[this.currentWorkplace].y : this.currentPosition.z + value;
                }
                hasXYMove = true;
+               hasMotionChange = true;
                break;
             case 'Z':
                if (this.zBelt) {
-                  this.currentZ = -Number(token.substring(1));
+                  this.currentZ = -value;
                   this.currentPosition.z = this.currentZ + this.currentPosition.y * this.adj;
                   hasXYMove = true;
+                  hasMotionChange = true;
                } else {
-                  this.currentPosition.y = this.absolute ? Number(token.substring(1)) + this.workplaceOffsets[this.currentWorkplace].z : this.currentPosition.y + Number(token.substring(1));
+                  this.currentPosition.y = this.absolute ? value + this.workplaceOffsets[this.currentWorkplace].z : this.currentPosition.y + value;
 
                   if (!this.lastY || this.lastY !== this.currentPosition.y) {
                      this.lastY = this.currentPosition.y;
@@ -417,22 +422,23 @@ export default class {
                   if (this.spreadLines) {
                      this.currentPosition.y *= this.spreadLineAmount;
                   }
+                  hasMotionChange = true;
                }
                break;
             case 'A':
                // Tangential axis, treat like an angular coordinate (deg)
-               const aVal = Number(token.substring(1));
-               this.currentA = this.absolute ? aVal : this.currentA + aVal;
+               this.currentA = this.absolute ? value : this.currentA + value;
+               hasMotionChange = true;
                break;
             case 'E':
                //Do not count retractions as extrusions
-               if (Number(token.substring(1)) > 0) {
+               if (value > 0) {
                   line.extruding = true;
                   this.maxHeight = this.currentPosition.y; //trying to get the max height of the model.
                }
                break;
             case 'F':
-               this.currentFeedRate = Number(token.substring(1));
+               this.currentFeedRate = value;
                line.feedRate = this.currentFeedRate;
                if (this.currentFeedRate > this.maxFeedRate) {
                   this.maxFeedRate = this.currentFeedRate;
@@ -461,6 +467,12 @@ export default class {
       }
 
       if (line.extruding && this.skip) {
+         return;
+      }
+
+      // Ignore non-motion lines (for example: "G1 S50") so they do not
+      // create zero-length segments that impact playback/camera behavior.
+      if (!hasMotionChange && !line.extruding) {
          return;
       }
 
@@ -556,6 +568,7 @@ export default class {
       let extruding = tokenString.indexOf('E') > 0 || this.g1AsExtrusion; //Treat as an extrusion in cnc mode
       let cw = tokens.filter((t) => t === 'G2' || t === 'G02');
       let arcResult = { position: this.currentPosition.clone(), points: [] };
+      let hasExplicitA = false;
       try {
          arcResult = doArc(tokens, this.currentPosition, !this.absolute, 0.1, this.fixRadius, this.arcPlane, this.workplaceOffsets[this.currentWorkplace]);
       } catch (ex) {
@@ -570,18 +583,25 @@ export default class {
          if (token[0] === 'A') {
             const aVal = Number(token.substring(1));
             targetA = this.absolute ? aVal : startA + aVal;
+            hasExplicitA = true;
             break;
          }
       }
+
+      if (arcResult.points.length === 0) {
+         return;
+      }
+
       // number of points generated for this arc
       const numPts = arcResult.points.length > 0 ? arcResult.points.length : 1;
+      let lastArcAngle = startA;
       
       let curPt = this.currentPosition.clone();
       arcResult.points.forEach((point, idx) => {
          const line = new gcodeLine();
          line.tool = this.currentTool;
          line.gcodeLineNumber = lineNumber;
-         line.gcodeFilePosition = filePosition;
+         line.gcodeFilePosition = filePosition + (idx / numPts);
          line.feedRate = this.currentFeedRate;
          line.isPerimeter = this.slicer.isPerimeter();
          if (this.g1AsExtrusion) {
@@ -592,9 +612,18 @@ export default class {
 
          line.start = curPt.clone();
          line.end = new Vector3(point.x, point.y, point.z);
-         // Interpolate A along the arc: startA -> targetA
-         const t = numPts > 1 ? idx / (numPts - 1) : 1;   // 0..1 along arc
-         line.aAngle = startA + (targetA - startA) * t;
+         // Keep cursor orientation tangential to the arc as it progresses.
+         // If an explicit A target was provided, blend toward it progressively.
+         const dx = line.end.x - line.start.x;
+         const dz = line.end.z - line.start.z;
+         const tangentialAngle = Math.atan2(dz, dx) * (180 / Math.PI);
+         if (hasExplicitA) {
+            const t = numPts > 1 ? idx / (numPts - 1) : 1; // 0..1 along arc
+            line.aAngle = startA + (targetA - startA) * t;
+         } else {
+            line.aAngle = tangentialAngle;
+         }
+         lastArcAngle = line.aAngle;
          
          // Track global min/max using the segment endpoints
          // start:
@@ -652,7 +681,7 @@ export default class {
       this.currentPosition = new Vector3(curPt.x, curPt.y, curPt.z);
 
       // End of arc: commit final A value
-      this.currentA = targetA;
+      this.currentA = hasExplicitA ? targetA : lastArcAngle;
 
       if (this.currentPosition.y > this.currentLayerHeight && !this.isSupport) {
          this.previousLayerHeight = this.currentLayerHeight;
@@ -803,7 +832,7 @@ export default class {
       //Remove the comments in the line
       let commentIndex = tokenString.indexOf(';');
       if (commentIndex > -1) {
-         tokenString = tokenString.substring(0, commentIndex - 1).trim();
+         tokenString = tokenString.substring(0, commentIndex).trim();
       }
       let tokens;
 
