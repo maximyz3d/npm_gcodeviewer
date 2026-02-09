@@ -386,6 +386,16 @@ export default class {
          this.followTopViewRadius = cam.radius;
          this._followTopViewInitialized = true;
       }
+
+      // Keep follow-mode zoom stable.
+      // Capture user wheel/pinch zoom as the chosen radius, then pin it
+      // to avoid progressive radius drift while target/alpha update on arcs.
+      if (Math.abs(cam.inertialRadiusOffset) > 0) {
+         this.followTopViewRadius = cam.radius;
+         cam.inertialRadiusOffset = 0;
+      } else if (Number.isFinite(this.followTopViewRadius)) {
+         cam.radius = this.followTopViewRadius;
+      }
    
       // Get nozzle world position
       let nozzlePos = Vector3.Zero();
