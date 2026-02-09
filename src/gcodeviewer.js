@@ -85,6 +85,7 @@ export default class {
       this.followTopView = true;
       this.followTopViewRadius = 0;
       this.followTopViewDefaultRadius = 20;
+      this.followTopViewInitialHeight = 12; // user-adjustable initial top-follow zoom
 
       // NEW: track when we’ve already applied the initial zoom
       this._followTopViewInitialized = false;
@@ -382,9 +383,19 @@ export default class {
    
       // only on first run of follow mode, set the base zoom
       if (!this._followTopViewInitialized) {
-         cam.radius = this.followTopViewDefaultRadius;
+         cam.radius = this.followTopViewInitialHeight;
          this.followTopViewRadius = cam.radius;
          this._followTopViewInitialized = true;
+      }
+
+      // Keep follow-mode zoom stable while preserving live wheel/pinch scrolling.
+      // ArcRotateCamera applies zoom inertia during render, so never clear
+      // inertialRadiusOffset here; just track intended zoom and pin only when
+      // no active zoom input is being consumed.
+      if (Math.abs(cam.inertialRadiusOffset) > 0) {
+         this.followTopViewRadius = cam.radius + cam.inertialRadiusOffset;
+      } else if (Number.isFinite(this.followTopViewRadius)) {
+         cam.radius = this.followTopViewRadius;
       }
    
       // Get nozzle world position
@@ -439,6 +450,13 @@ export default class {
    
          this._updateTopFollowCamera();
          this.forceRender();
+      }
+   }
+
+   setTopFollowInitialHeight(height) {
+      const value = Number(height);
+      if (Number.isFinite(value) && value > 0) {
+         this.followTopViewInitialHeight = value;
       }
    }
 
