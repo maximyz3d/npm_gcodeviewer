@@ -370,11 +370,7 @@ export default class {
       line.feedRate = this.currentFeedRate;
       line.isPerimeter = this.slicer.isPerimeter();
 
-      if ((command[0] === 'G1' || command[0] === 'G01') && this.g1AsExtrusion) {
-         line.extruding = true;
-         line.color = this.tools[this.currentTool]?.color.clone() ?? this.tools[0].color.clone();
-         this.maxHeight = this.zBelt ? this.currentPosition.z :  this.currentPosition.y; //trying to get the max height of the model.
-      }
+      const forceExtrusionMove = (command[0] === 'G1' || command[0] === 'G01') && this.g1AsExtrusion;
 
       if (this.zBelt) {
          tokens = tokens.sort().reverse();
@@ -470,10 +466,16 @@ export default class {
          return;
       }
 
-      // Ignore non-motion lines (for example: "G1 S50") so they do not
-      // create zero-length segments that impact playback/camera behavior.
-      if (!hasMotionChange && !line.extruding) {
+      // Only motion-bearing G0/G1 records are allowed to affect playback/path/camera.
+      // This filters non-motion lines like "G1 S50" even in CNC g1AsExtrusion mode.
+      if (!hasMotionChange) {
          return;
+      }
+
+      if (forceExtrusionMove) {
+         line.extruding = true;
+         line.color = this.tools[this.currentTool]?.color.clone() ?? this.tools[0].color.clone();
+         this.maxHeight = this.zBelt ? this.currentPosition.z : this.currentPosition.y;
       }
 
       line.end = this.currentPosition.clone();
