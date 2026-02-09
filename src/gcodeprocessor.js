@@ -360,13 +360,6 @@ export default class {
 
    g0g1(tokenString, lineNumber, filePosition, renderLine, command) {
       let tokens = tokenString.match(/[XYZEFA][+-]?\d*\.?\d+/g) ?? [];
-      const hasSupportedMotionToken = tokens.some((token) => ['X', 'Y', 'Z', 'A'].includes(token[0]));
-      if (!hasSupportedMotionToken) {
-         // Ignore pure metadata/auxiliary lines like: G1 S50, G1 M..., etc.
-         // This is especially important in CNC g1AsExtrusion mode.
-         return;
-      }
-
       const line = new gcodeLine();
       let hasXYMove = false;
       let hasMotionChange = false;
@@ -473,8 +466,8 @@ export default class {
          return;
       }
 
-      // Defensive no-op guard: by this point we should always have a supported axis token,
-      // but keep this in case future parsing changes alter tokenization behavior.
+      // Feed-only/modal updates (e.g. G1 F1200) should still update state,
+      // but lines without axis/tangential motion must not create render/path changes.
       if (!hasMotionChange) {
          return;
       }
